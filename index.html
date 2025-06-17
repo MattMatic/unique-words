@@ -93,6 +93,7 @@ function updateInputText() {
     normalize: cbNormalize.checked,
   };
   var words = findUniqueWords(input, options);
+  uniqueCount.innerText = words.length;
   outputText.value = words.join('\r\n');
 }
 
@@ -116,7 +117,7 @@ function updateInputText() {
   <td><textarea style="width:100%" id="inputText" cols='40' rows='8' oninput="updateInputText();">(paste text here)</textarea>
 </td></tr>
 
-<tr><th>Unique</th>
+<tr><th>Unique</br><div id='uniqueCount'></div></th>
 <td><textarea style="width:100%" id="outputText" cols='40' rows='20'></textarea></td>
 </tr></table>
 
