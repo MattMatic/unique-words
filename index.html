@@ -1,0 +1,124 @@
+<html>
+
+<head>
+<meta charset="utf-8">
+<!--
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Gulzar|Noto+Nastaliq+Urdu">
+-->
+<style>
+  body {
+    font-family: "Calibri";
+    background-color: #aacccc;
+  }
+.test_font {
+  font-family: "Test_Font";
+  font-kerning: normal;
+  font-size: 200%;
+  color: #000080;
+  text-align: center;
+}
+
+input[type="text"] {
+  font-size: 100%;
+}
+table, th, td {
+  border: 2px solid #448888;
+  border-collapse: collapse;
+  padding: 8px;
+}
+td {
+  align: 'left';
+}
+.hbtype table, .hbtype th, .hbtype td {
+  border: 0px;
+  padding: 4px;
+}
+.wordlist, input[type="file"] {
+  background-color: #8ebf42;
+}
+</style>
+</head>
+<body>
+
+<script>
+function findUniqueWords(input, options) {
+  let lang = HTMLLang.value;
+  if (lang === '') lang = 'en';
+  let segmenter = new Intl.Segmenter(lang, {granularity: 'word'});
+  let segments = segmenter.segment(input);
+  let words = {};
+  for (let {segment, index, isWordLike} of segments) {
+    if (isWordLike) {
+      let hasNumbers =  /\d/.test(segment);
+      if (!hasNumbers || options.numbers) {
+        if (options.normalize) segment = segment.normalize();
+        words[segment] = true;  // Assimilate a list
+      }
+    }
+  }
+  var res = [];
+  for (const word in words) {
+    res.push(word);
+  }
+  if (options.sort) {
+    res.sort();
+  }
+  return res;
+}
+
+async function pasteInputText() {
+  // Access clipboard and use Intl.segmenter to pull out words
+  let input = '';
+  //try {
+    const clipboardContents = await navigator.clipboard.read();
+    for (const item of clipboardContents) {
+      if (item.types.includes('text/plain')) {
+        const blob = await item.getType('text/plain');
+        const blobText = await blob.text();
+        inputText.value = blobText;
+        updateInputText();
+      }
+    }
+  //} catch (error) {
+  //  console.log(error.message);
+  //}
+}
+
+function updateInputText() {
+  let input = inputText.value;
+  var options = {
+    numbers: cbNumbers.checked,
+    sort: cbSort.checked,
+    normalize: cbNormalize.checked,
+  };
+  var words = findUniqueWords(input, options);
+  outputText.value = words.join('\r\n');
+}
+
+</script>
+
+
+<h1>Unique Words</h1>
+
+<table border=0 width='100%'>
+<tr><th>HTML Language</th><td><input type='text' id='HTMLLang' oninput='updateLanguage();' title='Web page language ID'/></td></tr>
+
+<tr><th>Options</th>
+  <td>
+    <input type='checkbox' id='cbNumbers' onclick='updateInputText();'>Numbers</input>
+    <input type='checkbox' id='cbNormalize' onclick='updateInputText();'>Normalize</input>
+    <input type='checkbox' id='cbSort' onclick='updateInputText();' checked>Sort</input>
+  </td>
+</tr>
+
+<tr><th>Input </br><button onclick='pasteInputText();'>Paste</button></th>
+  <td><textarea style="width:100%" id="inputText" cols='40' rows='8' oninput="updateInputText();">(paste text here)</textarea>
+</td></tr>
+
+<tr><th>Unique</th>
+<td><textarea style="width:100%" id="outputText" cols='40' rows='20'></textarea></td>
+</tr></table>
+
+</br>2025-06-17
+</body>
+</html>
