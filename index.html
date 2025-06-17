@@ -42,7 +42,7 @@ td {
 
 <script>
 function findUniqueWords(input, options) {
-  let lang = HTMLLang.value;
+  let lang = options.language;
   if (lang === '') lang = 'en';
   let segmenter = new Intl.Segmenter(lang, {granularity: 'word'});
   let segments = segmenter.segment(input);
@@ -87,6 +87,7 @@ async function pasteInputText() {
 function updateInputText() {
   let input = inputText.value;
   var options = {
+    language: HTMLLang.value,
     numbers: cbNumbers.checked,
     sort: cbSort.checked,
     normalize: cbNormalize.checked,
