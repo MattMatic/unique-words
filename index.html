@@ -40,9 +40,13 @@ function findUniqueWords(input, options) {
   let segmenter = new Intl.Segmenter(lang, {granularity: 'word'});
   let segments = segmenter.segment(input);
   let words = {};
+  var wordCount = 0;
+  var numberCount = 0;
   for (let {segment, index, isWordLike} of segments) {
     if (isWordLike) {
+      wordCount++;
       let hasNumbers =  /\d/.test(segment);
+      if (hasNumbers) numberCount++;
       if (!hasNumbers || options.numbers) {
         if (options.normalize) segment = segment.normalize();
         words[segment] = true;  // Assimilate a list
@@ -56,7 +60,11 @@ function findUniqueWords(input, options) {
   if (options.sort) {
     res.sort();
   }
-  return res;
+  return {
+    unique: res,
+    inputCount: wordCount,
+    numberCount: numberCount,
+  };
 }
 
 async function pasteInputText() {
@@ -85,8 +93,12 @@ function updateInputText() {
     sort: cbSort.checked,
     normalize: cbNormalize.checked,
   };
-  var words = findUniqueWords(input, options);
-  uniqueCount.innerText = words.length;
+  var wordsResult = findUniqueWords(input, options);
+  const words = wordsResult.unique;
+  var txt = wordsResult.inputCount + ' words';
+  if (wordsResult.numberCount > 0) txt += ', '+wordsResult.numberCount+' numbers';
+  inputCount.innerText = txt;
+  uniqueCount.innerText = words.length + ' words';
   outputText.value = words.join('\r\n');
 }
 
@@ -111,12 +123,12 @@ function updateLanguage() {
   </td>
 </tr>
 
-<tr><th>Input </br><button onclick='pasteInputText();'>Paste</button></th>
-  <td><textarea style="width:100%" id="inputText" rows='8' oninput="updateInputText();">(paste text here)</textarea>
+<tr><th>Input</br><button onclick='pasteInputText();'>Paste</button></th>
+  <td><textarea style="width:100%" id="inputText" rows='8' oninput="updateInputText();">(paste text here)</textarea><div id='inputCount'>-</div>
 </td></tr>
 
-<tr><th>Unique</br><div id='uniqueCount'></div></th>
-<td><textarea style="width:100%" id="outputText" rows='20'></textarea></td>
+<tr><th>Unique</th>
+<td><textarea style="width:100%" id="outputText" rows='20'></textarea><div id='uniqueCount'>-</div></td>
 </tr></table>
 
 <a href='https://github.com/MattMatic/unique-words'>github.com/MattMatic/unique-words</a>
