@@ -17,7 +17,6 @@
   color: #000080;
   text-align: center;
 }
-
 input[type="text"] {
   font-size: 100%;
 }
@@ -26,15 +25,9 @@ table, th, td {
   border-collapse: collapse;
   padding: 8px;
 }
-td {
-  align: 'left';
-}
-.hbtype table, .hbtype th, .hbtype td {
-  border: 0px;
-  padding: 4px;
-}
-.wordlist, input[type="file"] {
-  background-color: #8ebf42;
+textarea {
+  font-family: "Noto Sans";
+  font-size: 100%;
 }
 </style>
 </head>
@@ -43,7 +36,7 @@ td {
 <script>
 function findUniqueWords(input, options) {
   let lang = options.language;
-  if (lang === '') lang = 'en';
+  if (lang === '') lang = undefined;
   let segmenter = new Intl.Segmenter(lang, {granularity: 'word'});
   let segments = segmenter.segment(input);
   let words = {};
@@ -97,13 +90,18 @@ function updateInputText() {
   outputText.value = words.join('\r\n');
 }
 
+// Update the document language tag
+function updateLanguage() {
+  document.documentElement.setAttribute('lang', HTMLLang.value);
+}
+
 </script>
 
 
 <h1>Unique Words</h1>
 
 <table border=0 width='100%'>
-<tr><th>HTML Language</th><td><input type='text' id='HTMLLang' oninput='updateLanguage();' title='Web page language ID'/></td></tr>
+<tr><th width='20%'>HTML Language</th><td><input type='text' id='HTMLLang' oninput='updateLanguage();' title='Web page language ID'/></td></tr>
 
 <tr><th>Options</th>
   <td>
@@ -114,13 +112,14 @@ function updateInputText() {
 </tr>
 
 <tr><th>Input </br><button onclick='pasteInputText();'>Paste</button></th>
-  <td><textarea style="width:100%" id="inputText" cols='40' rows='8' oninput="updateInputText();">(paste text here)</textarea>
+  <td><textarea style="width:100%" id="inputText" rows='8' oninput="updateInputText();">(paste text here)</textarea>
 </td></tr>
 
 <tr><th>Unique</br><div id='uniqueCount'></div></th>
-<td><textarea style="width:100%" id="outputText" cols='40' rows='20'></textarea></td>
+<td><textarea style="width:100%" id="outputText" rows='20'></textarea></td>
 </tr></table>
 
-</br>2025-06-17
+<a href='https://github.com/MattMatic/unique-words'>github.com/MattMatic/unique-words</a>
+</br>2025-06-18
 </body>
 </html>
