@@ -55,6 +55,19 @@ function findUniqueWords(input, options) {
   }
   var res = [];
   for (const word in words) {
+    if (typeof options.ignore === 'string') {
+      let found = false;
+      for (let c of word) {
+        if (options.ignore.indexOf(c) >= 0) {
+          found = true;
+          break;
+        }
+      }
+      if (found) {
+        console.log('Whoops', word);
+        continue;
+      };
+    }
     res.push(word);
   }
   if (options.sort) {
@@ -93,6 +106,15 @@ function updateInputText() {
     sort: cbSort.checked,
     normalize: cbNormalize.checked,
   };
+  const ignore = inputIgnore.value;
+  if (ignore !== '') {
+    try {
+      const ignoreDecoded = decodeURIComponent(JSON.parse('"'+ignore+'"'));
+      options.ignore = ignoreDecoded;      
+    } catch (e) {
+      //console.log(e.message);
+    }
+  }
   var wordsResult = findUniqueWords(input, options);
   const words = wordsResult.unique;
   var txt = wordsResult.inputCount + ' words';
@@ -120,6 +142,8 @@ function updateLanguage() {
     <input type='checkbox' id='cbNumbers' onclick='updateInputText();'>Numbers</input>
     <input type='checkbox' id='cbNormalize' onclick='updateInputText();'>Normalize</input>
     <input type='checkbox' id='cbSort' onclick='updateInputText();' checked>Sort</input>
+    </br>
+    Ignore Characters:<input type='text' id='inputIgnore' size=64 oninput='updateInputText();'></input></br>(use e.g. `\u06f0` for Unicode)
   </td>
 </tr>
 
@@ -132,6 +156,6 @@ function updateLanguage() {
 </tr></table>
 
 <a href='https://github.com/MattMatic/unique-words'>github.com/MattMatic/unique-words</a>
-</br>2025-06-18
+</br>2025-07-07
 </body>
 </html>
