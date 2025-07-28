@@ -34,7 +34,27 @@ textarea {
 <body>
 
 <script>
-function findUniqueWords(input, options) {
+
+// polyfill for scheduler.yield
+globalThis.scheduler = globalThis.scheduler || {};
+globalThis.scheduler.yield = 
+  globalThis.scheduler.yield || 
+  (() => new Promise((r) => setTimeout(r, 0)));
+
+class ElapsedTimer {
+  constructor(t=32) {
+    this.max = t;
+    this.next = performance.now() + t;
+  }
+  elapsed() {
+    const now = performance.now();
+    if (now < this.next) return false;
+    while (now > this.next) this.next += this.max;
+    return true;
+  }
+}
+
+async function findUniqueWords(input, options) {
   let lang = options.language;
   if (lang === '') lang = undefined;
   let segmenter = new Intl.Segmenter(lang, {granularity: 'word'});
@@ -42,7 +62,15 @@ function findUniqueWords(input, options) {
   let words = {};
   var wordCount = 0;
   var numberCount = 0;
+  let counter = 0;
+  let et = new ElapsedTimer();
+
   for (let {segment, index, isWordLike} of segments) {
+    counter++;
+    if (et.elapsed()) {
+      inputCount.innerText = 'Progress: '+wordCount+' / '+counter;
+      await scheduler.yield();
+    }
     if (isWordLike) {
       wordCount++;
       let hasNumbers =  /\d/.test(segment);
@@ -79,17 +107,24 @@ function findUniqueWords(input, options) {
   };
 }
 
+let blobText = '';
+let outputWords = '';
+
 async function pasteInputText() {
   // Access clipboard and use Intl.segmenter to pull out words
   let input = '';
+  inputCount.innerText = '...pasting...';
   //try {
     const clipboardContents = await navigator.clipboard.read();
     for (const item of clipboardContents) {
       if (item.types.includes('text/plain')) {
         const blob = await item.getType('text/plain');
-        const blobText = await blob.text();
-        inputText.value = blobText;
-        updateInputText();
+        blobText = await blob.text();
+        if (blobText.length < 1024*1024)
+          inputText.value = blobText;
+        else
+          inputText.value = '(too large to show)';
+        processInputText();
       }
     }
   //} catch (error) {
@@ -98,7 +133,12 @@ async function pasteInputText() {
 }
 
 function updateInputText() {
-  let input = inputText.value;
+  blobText = inputText.value;
+  processInputText();
+}
+
+async function processInputText() {
+  const input = blobText;
   var options = {
     language: HTMLLang.value,
     numbers: cbNumbers.checked,
@@ -114,13 +154,36 @@ function updateInputText() {
       //console.log(e.message);
     }
   }
-  var wordsResult = findUniqueWords(input, options);
+  var wordsResult = await findUniqueWords(input, options);
   const words = wordsResult.unique;
   var txt = wordsResult.inputCount + ' words';
   if (wordsResult.numberCount > 0) txt += ', '+wordsResult.numberCount+' numbers';
   inputCount.innerText = txt;
   uniqueCount.innerText = words.length + ' words';
-  outputText.value = words.join('\r\n');
+  uniqueWordList = words;
+  outputWords = words.join('\r\n');
+  if (outputWords.length > 2*1024*1024) {
+    outputText.value = '(too large)';
+  } else {
+    outputText.value = outputWords;
+  }
+}
+
+function DateTimeForFilename() {
+  //  012345678901234567890123
+  // '2024-11-07T14:55:03.791Z'
+  var d = new Date().toJSON();
+  return d.slice(0,4)+d.slice(5,7)+d.slice(8,10)+'_'+
+         d.slice(11,13)+d.slice(14,16)+d.slice(17,19);
+}
+
+function downloadUniqueWords() {
+  var bb = new Blob([outputWords], {type: 'text/plain;charset=utf-8'});
+  var a = document.createElement('a');
+  a.download = 'UniqueWords.'+DateTimeForFilename()+'.txt';
+  a.href = window.URL.createObjectURL(bb);
+  a.target = '_blank';
+  a.click();
 }
 
 // Update the document language tag
@@ -138,11 +201,11 @@ function updateLanguage() {
 
 <tr><th>Options</th>
   <td>
-    <input type='checkbox' id='cbNumbers' onclick='updateInputText();'>Numbers</input>
-    <input type='checkbox' id='cbNormalize' onclick='updateInputText();'>Normalize</input>
-    <input type='checkbox' id='cbSort' onclick='updateInputText();' checked>Sort</input>
+    <input type='checkbox' id='cbNumbers' onclick='processInputText();'>Numbers</input>
+    <input type='checkbox' id='cbNormalize' onclick='processInputText();'>Normalize</input>
+    <input type='checkbox' id='cbSort' onclick='processInputText();' checked>Sort</input>
     </br>
-    Ignore Characters:<input type='text' id='inputIgnore' size=64 oninput='updateInputText();'></input></br>(use e.g. `\u06f0` for Unicode)
+    Ignore Characters:<input type='text' id='inputIgnore' size=64 oninput='processInputText();'></input></br>(use e.g. `\u06f0` for Unicode)
   </td>
 </tr>
 
@@ -150,11 +213,11 @@ function updateLanguage() {
   <td><textarea style="width:100%" id="inputText" rows='8' oninput="updateInputText();">(paste text here)</textarea><div id='inputCount'>-</div>
 </td></tr>
 
-<tr><th>Unique</th>
+<tr><th>Unique</br><button onclick='downloadUniqueWords();'>Download</button></th>
 <td><textarea style="width:100%" id="outputText" rows='20'></textarea><div id='uniqueCount'>-</div></td>
 </tr></table>
 
 <a href='https://github.com/MattMatic/unique-words'>github.com/MattMatic/unique-words</a>
-</br>2025-07-07
+</br>2025-07-28
 </body>
 </html>
