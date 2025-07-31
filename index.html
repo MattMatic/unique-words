@@ -35,6 +35,9 @@ textarea {
 
 <script>
 
+const MAXIMUM_TEXT_SIZE = 100000;
+const TOO_LARGE_TO_SHOW = 'TEXT TOO LARGE\r\n(Showing first '+MAXIMUM_TEXT_SIZE+' chars)\r\n\r\n';
+
 // polyfill for scheduler.yield
 globalThis.scheduler = globalThis.scheduler || {};
 globalThis.scheduler.yield = 
@@ -54,6 +57,27 @@ class ElapsedTimer {
   }
 }
 
+function disableControls(doDisable = true) {
+  cbNumbers.disabled = doDisable;
+  cbSort.disabled = doDisable;
+  cbNormalize.disabled = doDisable;
+  btnPaste.disabled = doDisable;
+  inputText.disabled = doDisable;
+  inputIgnore.disabled = doDisable;
+  if (doDisable) {
+    btnUpdate.disabled = doDisable;
+  }
+  btnDownload.disabled = doDisable;
+  btnCopyToClipboard.disabled = doDisable;
+  HTMLLang.disabled = doDisable;
+}
+
+let abortTheLoop = false;
+
+function doAbortTheLoop() {
+  abortTheLoop = true;
+}
+
 async function findUniqueWords(input, options) {
   let lang = options.language;
   if (lang === '') lang = undefined;
@@ -64,13 +88,17 @@ async function findUniqueWords(input, options) {
   var numberCount = 0;
   let counter = 0;
   let et = new ElapsedTimer();
+  abortTheLoop = false;
 
+  btnAbort.hidden = false;
   for (let {segment, index, isWordLike} of segments) {
     counter++;
     if (et.elapsed()) {
-      inputCount.innerText = 'Progress: '+wordCount+' / '+counter;
+      inputCount.innerText = 
+        'Progress: '+wordCount+' / '+counter;
       await scheduler.yield();
     }
+    if (abortTheLoop) break;
     if (isWordLike) {
       wordCount++;
       let hasNumbers =  /\d/.test(segment);
@@ -81,6 +109,11 @@ async function findUniqueWords(input, options) {
       }
     }
   }
+  btnAbort.hidden = true;
+
+  inputCount.innerText = '...filtering...';
+  await scheduler.yield();
+
   var res = [];
   for (const word in words) {
     if (typeof options.ignore === 'string') {
@@ -97,15 +130,51 @@ async function findUniqueWords(input, options) {
     }
     res.push(word);
   }
+
+  inputCount.innerText = '...sorting..';
+  await scheduler.yield();
+
   if (options.sort) {
     res.sort();
   }
+
   return {
     unique: res,
     inputCount: wordCount,
     numberCount: numberCount,
   };
 }
+
+//------------------------------
+// Drag and drop utilities
+//------------------------------
+function cancel(e) {e.stopPropagation();e.preventDefault();}
+function patchDragDrop(ele, foo) {
+  //const ele = document.getElementById(id);
+  ele.addEventListener('dragover', function(e) {
+    cancel(e);
+    ele.style.backgroundColor = 'yellow';
+    }, false);
+  ele.addEventListener('dragleave', function(e) {
+    cancel(e);
+    ele.style.backgroundColor = null;
+    }, false);
+  ele.addEventListener('drop', function(e) {
+    cancel(e);
+    const file = e.dataTransfer.files[0];
+    ele.style.backgroundColor = null;
+    foo(file, ele);
+  });
+}
+document.addEventListener('dragover', cancel, false);
+document.addEventListener('dragleave', cancel, false);
+document.addEventListener('drop', cancel, false);
+window.addEventListener('beforeunload', function(e) {
+  if (!checkListChanged) return undefined;
+  var confirmMessage = 'CheckList is not yet saved. If you leave before saving, changes will be lost!';
+  (e || window.event).returnValue = confirmMessage;
+  return confirmMessage;
+});
 
 let blobText = '';
 let outputWords = '';
@@ -120,10 +189,6 @@ async function pasteInputText() {
       if (item.types.includes('text/plain')) {
         const blob = await item.getType('text/plain');
         blobText = await blob.text();
-        if (blobText.length < 1024*1024)
-          inputText.value = blobText;
-        else
-          inputText.value = '(too large to show)';
         processInputText();
       }
     }
@@ -134,6 +199,17 @@ async function pasteInputText() {
 
 function updateInputText() {
   blobText = inputText.value;
+  processInputText();
+}
+
+function optionsChanged() {
+  if (blobText.length > MAXIMUM_TEXT_SIZE)
+    btnUpdate.disabled = false;
+  else
+    processInputText();
+}
+
+function doUpdateButton() {
   processInputText();
 }
 
@@ -154,6 +230,14 @@ async function processInputText() {
       //console.log(e.message);
     }
   }
+  disableControls(true);
+
+  if (blobText.length < MAXIMUM_TEXT_SIZE)
+    inputText.value = blobText;
+  else {
+    inputText.value = TOO_LARGE_TO_SHOW + blobText.substr(0, MAXIMUM_TEXT_SIZE)+'...';
+  }
+
   var wordsResult = await findUniqueWords(input, options);
   const words = wordsResult.unique;
   var txt = wordsResult.inputCount + ' words';
@@ -162,11 +246,13 @@ async function processInputText() {
   uniqueCount.innerText = words.length + ' words';
   uniqueWordList = words;
   outputWords = words.join('\r\n');
-  if (outputWords.length > 2*1024*1024) {
-    outputText.value = '(too large)';
+
+  if (outputWords.length > MAXIMUM_TEXT_SIZE) {
+    outputText.value = TOO_LARGE_TO_SHOW + outputWords.substr(0, MAXIMUM_TEXT_SIZE)+'...';
   } else {
     outputText.value = outputWords;
   }
+  disableControls(false);
 }
 
 function DateTimeForFilename() {
@@ -186,9 +272,25 @@ function downloadUniqueWords() {
   a.click();
 }
 
+function copyUniqueWords() {
+  navigator.clipboard.writeText(outputWords);
+}
+
 // Update the document language tag
 function updateLanguage() {
   document.documentElement.setAttribute('lang', HTMLLang.value);
+}
+
+function handeInputDragDrop(file) {
+  if (!file) return;
+  const fileName = file.name.toLowerCase();
+  if (!fileName.endsWith('.txt')) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    blobText = e.target.result;
+    processInputText();
+  }
+  reader.readAsText(file);
 }
 
 </script>
@@ -197,27 +299,61 @@ function updateLanguage() {
 <h1>Unique Words</h1>
 
 <table border=0 width='100%'>
-<tr><th width='20%'>HTML Language</th><td><input type='text' id='HTMLLang' oninput='updateLanguage();' title='Web page language ID'/></td></tr>
-
-<tr><th>Options</th>
+<tr>
+  <th width='20%'>
+    HTML Language
+  </th>
   <td>
-    <input type='checkbox' id='cbNumbers' onclick='processInputText();'>Numbers</input>
-    <input type='checkbox' id='cbNormalize' onclick='processInputText();'>Normalize</input>
-    <input type='checkbox' id='cbSort' onclick='processInputText();' checked>Sort</input>
-    </br>
-    Ignore Characters:<input type='text' id='inputIgnore' size=64 oninput='processInputText();'></input></br>(use e.g. `\u06f0` for Unicode)
+    <input type='text' id='HTMLLang' oninput='updateLanguage();' title='Web page language ID'/>
+    <a href='https://www.w3schools.com/tags/ref_language_codes.asp' target='_blank'>(W3 Schools reference)</a>
   </td>
 </tr>
 
-<tr><th>Input</br><button onclick='pasteInputText();'>Paste</button></th>
-  <td><textarea style="width:100%" id="inputText" rows='8' oninput="updateInputText();">(paste text here)</textarea><div id='inputCount'>-</div>
-</td></tr>
+<tr>
+  <th>
+    Options
+    </br>
+    <button onclick='doUpdateButton();' id='btnUpdate' disabled>Update</button>
+  </th>
+  <td>
+    <input type='checkbox' id='cbNumbers' onclick='optionsChanged();' title='Ignore words that include numbers'>Numbers</input>
+    <input type='checkbox' id='cbNormalize' onclick='optionsChanged();' title='Unicode normalize the words'>Normalize</input>
+    <input type='checkbox' id='cbSort' onclick='optionsChanged();' title='Sort the output words' checked>Sort</input>
+    </br>
+    Ignore Characters: <input type='text' id='inputIgnore' size=64 oninput='optionsChanged();' title='Ignore words that include any of these characters'></input></br>(use e.g. `\u06f0` for Unicode)    
+  </td>
+</tr>
 
-<tr><th>Unique</br><button onclick='downloadUniqueWords();'>Download</button></th>
-<td><textarea style="width:100%" id="outputText" rows='20'></textarea><div id='uniqueCount'>-</div></td>
-</tr></table>
+<tr>
+  <th>
+    Input Text
+    </br>
+    <button onclick='pasteInputText();' id='btnPaste'>Paste</button>
+  </th>
+  <td>
+    <textarea style="width:100%;line-clamp:2000" id="inputText" rows='8' oninput="updateInputText();">(paste text here, or drag and drop .txt file)</textarea>
+    <button id='btnAbort' hidden onclick='doAbortTheLoop();'>Abort</button>&nbsp;
+    <span id='inputCount'>-</span>
+  </td>
+</tr>
 
+<tr>
+  <th>
+    Unique Words
+    </br>
+    <button onclick='copyUniqueWords();' id='btnCopyToClipboard'>Copy to Clipboard</button>
+    </br>
+    <button onclick='downloadUniqueWords();' id='btnDownload'>Download</button>
+  </th>
+  <td>
+    <textarea style="width:100%;line-clamp:2000" id="outputText" rows='20'></textarea><div id='uniqueCount'>-</div>
+  </td>
+</tr>
+</table>
+<script>
+  patchDragDrop(inputText, handeInputDragDrop);
+</script>
 <a href='https://github.com/MattMatic/unique-words'>github.com/MattMatic/unique-words</a>
-</br>2025-07-28
+</br>2025-07-31
 </body>
 </html>
