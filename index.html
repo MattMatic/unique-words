@@ -203,10 +203,14 @@ function updateInputText() {
 }
 
 function optionsChanged() {
+  let activeElement = document.activeElement;
   if (blobText.length > MAXIMUM_TEXT_SIZE)
     btnUpdate.disabled = false;
   else
     processInputText();
+  if (activeElement) {
+    setTimeout( () => { activeElement.focus();} );
+  }
 }
 
 function doUpdateButton() {
@@ -354,6 +358,6 @@ function handeInputDragDrop(file) {
   patchDragDrop(inputText, handeInputDragDrop);
 </script>
 <a href='https://github.com/MattMatic/unique-words'>github.com/MattMatic/unique-words</a>
-</br>2025-07-31
+</br>2025-08-27
 </body>
 </html>
