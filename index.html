@@ -73,17 +73,18 @@ function disableControls(doDisable = true) {
 }
 
 let abortTheLoop = false;
+let ignoreWords = new Set();
 
 function doAbortTheLoop() {
   abortTheLoop = true;
 }
 
-async function findUniqueWords(input, options) {
+async function findUniqueWords(input, options, ignoreWords) {
   let lang = options.language;
   if (lang === '') lang = undefined;
   let segmenter = new Intl.Segmenter(lang, {granularity: 'word'});
   let segments = segmenter.segment(input);
-  let words = {};
+  let words = new Set();
   var wordCount = 0;
   var numberCount = 0;
   let counter = 0;
@@ -105,31 +106,33 @@ async function findUniqueWords(input, options) {
       if (hasNumbers) numberCount++;
       if (!hasNumbers || options.numbers) {
         if (options.normalize) segment = segment.normalize();
-        words[segment] = true;  // Assimilate a list
+        words.add(segment);
       }
     }
   }
   btnAbort.hidden = true;
 
+  if (ignoreWords) {
+    inputCount.innerText = '...ignore words...';
+    words = words.difference(ignoreWords);
+  }
+
   inputCount.innerText = '...filtering...';
   await scheduler.yield();
 
   var res = [];
-  for (const word in words) {
+  words.forEach((word) => {
+    let found = false;
     if (typeof options.ignore === 'string') {
-      let found = false;
       for (let c of word) {
         if (options.ignore.indexOf(c) >= 0) {
           found = true;
           break;
         }
       }
-      if (found) {
-        continue;
-      };
     }
-    res.push(word);
-  }
+    if (!found) res.push(word);
+  });
 
   inputCount.innerText = '...sorting..';
   await scheduler.yield();
@@ -197,6 +200,26 @@ async function pasteInputText() {
   //}
 }
 
+async function pasteIgnoreWords() {
+  let input = '';
+  ignoreWords.clear();
+  const clipboardContents = await navigator.clipboard.read();
+  for (const item of clipboardContents) {
+    if (item.types.includes('text/plain')) {
+      const blob = await item.getType('text/plain');
+      let txt = await blob.text();
+      processIgnoreWords(txt);
+    }
+  }
+  processInputText();
+}
+
+async function clearIgnoreWords() {
+  ignoreWords.clear();
+  processIgnoreWords('');
+  processInputText();
+}
+
 function updateInputText() {
   blobText = inputText.value;
   processInputText();
@@ -242,7 +265,7 @@ async function processInputText() {
     inputText.value = TOO_LARGE_TO_SHOW + blobText.substr(0, MAXIMUM_TEXT_SIZE)+'...';
   }
 
-  var wordsResult = await findUniqueWords(input, options);
+  var wordsResult = await findUniqueWords(input, options, ignoreWords);
   const words = wordsResult.unique;
   var txt = wordsResult.inputCount + ' words';
   if (wordsResult.numberCount > 0) txt += ', '+wordsResult.numberCount+' numbers';
@@ -297,6 +320,40 @@ function handeInputDragDrop(file) {
   reader.readAsText(file);
 }
 
+function splitLinesToArray(txt) {
+  var lines = txt.split(/\r?\n+/g);
+  var tempWordList = [];  // Start empty
+  lines.forEach( (line) => {
+    tempWordList.push(line);
+  });
+  return tempWordList;
+}
+
+function processIgnoreWords(txt) {
+  //ignoreWords.clear(); -- do this in the caller to allow multiple pastes
+  let lines = splitLinesToArray(txt);
+  lines.forEach((line)=>{
+    if (line.search(/^\s+[#;]/) < 0) {
+      if (line.length > 0) ignoreWords.add(line);
+    }
+  });
+  tdIgnoreWords.innerText = `Words: ${ignoreWords.size}`;
+}
+
+function handleIgnoreDragDrop(file) {
+  if (!file) return;
+  const fileName = file.name.toLowerCase();
+  if (!fileName.endsWith('.txt')) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    let txt = e.target.result;
+    ignoreWords.clear();
+    processIgnoreWords(txt);
+    processInputText();
+  }
+  reader.readAsText(file);
+}
+
 </script>
 
 
@@ -316,22 +373,34 @@ function handeInputDragDrop(file) {
 <tr>
   <th>
     Options
-    </br>
+    <br/>
     <button onclick='doUpdateButton();' id='btnUpdate' disabled>Update</button>
   </th>
   <td>
     <input type='checkbox' id='cbNumbers' onclick='optionsChanged();' title='Ignore words that include numbers'>Numbers</input>
     <input type='checkbox' id='cbNormalize' onclick='optionsChanged();' title='Unicode normalize the words'>Normalize</input>
     <input type='checkbox' id='cbSort' onclick='optionsChanged();' title='Sort the output words' checked>Sort</input>
-    </br>
-    Ignore Characters: <input type='text' id='inputIgnore' size=64 oninput='optionsChanged();' title='Ignore words that include any of these characters'></input></br>(use e.g. `\u06f0` for Unicode)    
+    <br/>
+    Ignore Characters: <input type='text' id='inputIgnore' size=64 oninput='optionsChanged();' title='Ignore words that include any of these characters'></input><br/>(use e.g. `\u06f0` for Unicode)    
+  </td>
+</tr>
+
+<tr>
+  <th>
+    Known Words to Ignore
+    <br/>
+    <button onclick='clearIgnoreWords();' id='btnClearIgnore'>Clear</button>
+    <button onclick='pasteIgnoreWords();' id='btnPasteIgnore'>Paste</button>
+  </th>
+  <td id='tdIgnoreWords'>
+    (drag and drop .txt file)
   </td>
 </tr>
 
 <tr>
   <th>
     Input Text
-    </br>
+    <br/>
     <button onclick='pasteInputText();' id='btnPaste'>Paste</button>
   </th>
   <td>
@@ -344,9 +413,9 @@ function handeInputDragDrop(file) {
 <tr>
   <th>
     Unique Words
-    </br>
+    <br/>
     <button onclick='copyUniqueWords();' id='btnCopyToClipboard'>Copy to Clipboard</button>
-    </br>
+    <br/>
     <button onclick='downloadUniqueWords();' id='btnDownload'>Download</button>
   </th>
   <td>
@@ -356,8 +425,9 @@ function handeInputDragDrop(file) {
 </table>
 <script>
   patchDragDrop(inputText, handeInputDragDrop);
+  patchDragDrop(tdIgnoreWords, handleIgnoreDragDrop);
 </script>
 <a href='https://github.com/MattMatic/unique-words'>github.com/MattMatic/unique-words</a>
-</br>2025-08-27
+<br/>2025-11-24
 </body>
 </html>
