@@ -92,6 +92,8 @@ async function findUniqueWords(input, options, ignoreWords) {
   abortTheLoop = false;
 
   btnAbort.hidden = false;
+  let punc = '';
+  let word = '';
   for (let {segment, index, isWordLike} of segments) {
     counter++;
     if (et.elapsed()) {
@@ -102,14 +104,36 @@ async function findUniqueWords(input, options, ignoreWords) {
     if (abortTheLoop) break;
     if (isWordLike) {
       wordCount++;
-      let hasNumbers =  /\d/.test(segment);
+      let hasNumbers =  /\p{Number}/u.test(segment); // Unicode aware numbers
       if (hasNumbers) numberCount++;
       if (!hasNumbers || options.numbers) {
-        if (options.normalize) segment = segment.normalize();
-        words.add(segment);
+        word = punc + segment;
+        punc = '';
+        if (options.normalize)
+          word = word.normalize();
+      }
+    } else {
+      if (options.punctuation) {
+        let r = segment.match(/^(\p{P}*)$/gu);
+        if (r && r[0]) {
+          punc += r[0];
+        } else {
+          if (word.length > 0) {
+            words.add(word + punc);
+            word = '';
+          }
+          punc = '';
+        }
+      } else {
+        if (word.length > 0) words.add(word);
+        word = '';
       }
     }
   }
+  if (word.length > 0) {
+    words.add(word + punc);
+  }
+
   btnAbort.hidden = true;
 
   if (ignoreWords) {
@@ -247,6 +271,7 @@ async function processInputText() {
     numbers: cbNumbers.checked,
     sort: cbSort.checked,
     normalize: cbNormalize.checked,
+    punctuation: cbPunctuation.checked,
   };
   const ignore = inputIgnore.value;
   if (ignore !== '') {
@@ -342,12 +367,13 @@ function processIgnoreWords(txt) {
         for (let {segment, index, isWordLike} of segments) {
           if (isWordLike) {
             ignoreWords.add(segment);
-            break; // Only take the first word-like segment
           }
+          break; // Only consider the first segment
         }
       }
     }
   });
+
   tdIgnoreWords.innerText = `Words: ${ignoreWords.size}`;
 }
 
@@ -388,7 +414,8 @@ function handleIgnoreDragDrop(file) {
     <button onclick='doUpdateButton();' id='btnUpdate' disabled>Update</button>
   </th>
   <td>
-    <input type='checkbox' id='cbNumbers' onclick='optionsChanged();' title='Ignore words that include numbers'>Numbers</input>
+    <input type='checkbox' id='cbNumbers' onclick='optionsChanged();' title='Include words that include numbers'>Numbers</input>
+    <input type='checkbox' id='cbPunctuation' onclick='optionsChanged();' title='Include punctuation'>Punctuation</input>
     <input type='checkbox' id='cbNormalize' onclick='optionsChanged();' title='Unicode normalize the words'>Normalize</input>
     <input type='checkbox' id='cbSort' onclick='optionsChanged();' title='Sort the output words' checked>Sort</input>
     <br/>
