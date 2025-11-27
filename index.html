@@ -332,9 +332,20 @@ function splitLinesToArray(txt) {
 function processIgnoreWords(txt) {
   //ignoreWords.clear(); -- do this in the caller to allow multiple pastes
   let lines = splitLinesToArray(txt);
+  let lang = HTMLLang.value;
+  if (lang === '') lang = undefined;
+  let segmenter = new Intl.Segmenter(lang, {granularity: 'word'});
   lines.forEach((line)=>{
     if (line.search(/^\s+[#;]/) < 0) {
-      if (line.length > 0) ignoreWords.add(line);
+      if (line.length > 0) {
+        let segments = segmenter.segment(line);
+        for (let {segment, index, isWordLike} of segments) {
+          if (isWordLike) {
+            ignoreWords.add(segment);
+            break; // Only take the first word-like segment
+          }
+        }
+      }
     }
   });
   tdIgnoreWords.innerText = `Words: ${ignoreWords.size}`;
@@ -428,6 +439,6 @@ function handleIgnoreDragDrop(file) {
   patchDragDrop(tdIgnoreWords, handleIgnoreDragDrop);
 </script>
 <a href='https://github.com/MattMatic/unique-words'>github.com/MattMatic/unique-words</a>
-<br/>2025-11-24
+<br/>2025-11-27
 </body>
 </html>
