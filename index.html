@@ -29,6 +29,20 @@ textarea {
   font-family: "Noto Sans";
   font-size: 100%;
 }
+dialog::backdrop {
+  background-color: hsl(100, 40%, 50%, 0.3);
+}
+dialog {
+  background-color: #e8ece8;
+}
+[aria-label="close"] {
+  appearance: none;
+  background-color: #fcc;
+  float: right;
+  border: 1px solid;
+  border-radius: 50%;
+}
+
 </style>
 </head>
 <body>
@@ -83,7 +97,6 @@ async function findUniqueWords(input, options, ignoreWords) {
   let lang = options.language;
   if (lang === '') lang = undefined;
   let segmenter = new Intl.Segmenter(lang, {granularity: 'word'});
-  let segments = segmenter.segment(input);
   let words = new Set();
   var wordCount = 0;
   var numberCount = 0;
@@ -92,8 +105,21 @@ async function findUniqueWords(input, options, ignoreWords) {
   abortTheLoop = false;
 
   btnAbort.hidden = false;
+
   let punc = '';
   let word = '';
+  let puncpre = '';
+
+  const addWord = function() {
+    if (word.length > 0) {
+      words.add(puncpre + word + punc);
+      if (options.justword) words.add(word);
+    }
+    word = '';
+    puncpre = '';
+  };
+
+  let segments = segmenter.segment(input);
   for (let {segment, index, isWordLike} of segments) {
     counter++;
     if (et.elapsed()) {
@@ -107,7 +133,9 @@ async function findUniqueWords(input, options, ignoreWords) {
       let hasNumbers =  /\p{Number}/u.test(segment); // Unicode aware numbers
       if (hasNumbers) numberCount++;
       if (!hasNumbers || options.numbers) {
-        word = punc + segment;
+        //word = punc + segment;
+        word = segment;
+        puncpre = punc;
         punc = '';
         if (options.normalize)
           word = word.normalize();
@@ -118,21 +146,15 @@ async function findUniqueWords(input, options, ignoreWords) {
         if (r && r[0]) {
           punc += r[0];
         } else {
-          if (word.length > 0) {
-            words.add(word + punc);
-            word = '';
-          }
+          addWord();
           punc = '';
         }
       } else {
-        if (word.length > 0) words.add(word);
-        word = '';
+        addWord();
       }
     }
   }
-  if (word.length > 0) {
-    words.add(word + punc);
-  }
+  addWord();
 
   btnAbort.hidden = true;
 
@@ -251,6 +273,7 @@ function updateInputText() {
 
 function optionsChanged() {
   let activeElement = document.activeElement;
+  cbJustWord.disabled = !cbPunctuation.checked;
   if (blobText.length > MAXIMUM_TEXT_SIZE)
     btnUpdate.disabled = false;
   else
@@ -265,13 +288,14 @@ function doUpdateButton() {
 }
 
 async function processInputText() {
-  const input = blobText;
+  let input = blobText;
   var options = {
     language: HTMLLang.value,
     numbers: cbNumbers.checked,
     sort: cbSort.checked,
     normalize: cbNormalize.checked,
     punctuation: cbPunctuation.checked,
+    justword: cbJustWord.checked,
   };
   const ignore = inputIgnore.value;
   if (ignore !== '') {
@@ -284,10 +308,25 @@ async function processInputText() {
   }
   disableControls(true);
 
-  if (blobText.length < MAXIMUM_TEXT_SIZE)
-    inputText.value = blobText;
+  const reTxt = inputFilter.value;
+  if (cbFilter.checked && (reTxt.length > 0)) {
+    let inputNew = '';
+    const re = new RegExp(reTxt, 'gu');
+    const lines = input.split(/\r?\n+/g);
+    lines.forEach( (line) => {
+      re.lastIndex = 0;
+      let res = re.exec(line);
+      if (res) {
+        inputNew += res.slice(1).join(' ')+'\r\n';
+      }
+    });
+    input = inputNew;
+  }
+
+  if (input.length < MAXIMUM_TEXT_SIZE)
+    inputText.value = input;
   else {
-    inputText.value = TOO_LARGE_TO_SHOW + blobText.substr(0, MAXIMUM_TEXT_SIZE)+'...';
+    inputText.value = TOO_LARGE_TO_SHOW + input.substr(0, MAXIMUM_TEXT_SIZE)+'...';
   }
 
   var wordsResult = await findUniqueWords(input, options, ignoreWords);
@@ -416,6 +455,7 @@ function handleIgnoreDragDrop(file) {
   <td>
     <input type='checkbox' id='cbNumbers' onclick='optionsChanged();' title='Include words that include numbers'>Numbers</input>
     <input type='checkbox' id='cbPunctuation' onclick='optionsChanged();' title='Include punctuation'>Punctuation</input>
+    <input type='checkbox' id='cbJustWord' onclick='optionsChanged();' title='Include word when using punctuation' disabled>+Word</input>
     <input type='checkbox' id='cbNormalize' onclick='optionsChanged();' title='Unicode normalize the words'>Normalize</input>
     <input type='checkbox' id='cbSort' onclick='optionsChanged();' title='Sort the output words' checked>Sort</input>
     <br/>
@@ -442,6 +482,21 @@ function handleIgnoreDragDrop(file) {
     <button onclick='pasteInputText();' id='btnPaste'>Paste</button>
   </th>
   <td>
+    <input type='checkbox' id='cbFilter' title='Enable RegExp filtering'>Filter</input>
+    <button id='btnFilter'>RegExp...</button> <kbd><span id='filterState'>(off)</span></kbd>
+    <dialog id='dlgFilter'>
+      <button type="submit" aria-label="close" onclick="dlgFilter.close();">X</button>
+      <h2>RegExp Filter</h2>
+      <kbd>/<input type='text' style='font-family:monospace;' id='inputFilter'/>/gu</kbd>
+      <br/>
+      <font color='red'><span id='spanFilterError'></span></font>
+      <br/>
+      Test:
+      <textarea style='width:100%;' id='textTestInput' rows=5 cols=40></textarea>
+      <br/>
+      Output:
+      <textarea style='width:100%;' id='textTestOutput' rows=5 cols=40></textarea>      
+    </dialog>
     <textarea style="width:100%;line-clamp:2000" id="inputText" rows='8' oninput="updateInputText();">(paste text here, or drag and drop .txt file)</textarea>
     <button id='btnAbort' hidden onclick='doAbortTheLoop();'>Abort</button>&nbsp;
     <span id='inputCount'>-</span>
@@ -464,8 +519,60 @@ function handleIgnoreDragDrop(file) {
 <script>
   patchDragDrop(inputText, handeInputDragDrop);
   patchDragDrop(tdIgnoreWords, handleIgnoreDragDrop);
+
+
+//------------------------
+// Filter Dialog Handling
+//------------------------
+function textTestInputChange() {
+  const reTxt = inputFilter.value;
+  textTestOutput.value = '';
+  spanFilterError.innerText = '';
+  filterState.innerText = '(off)';
+  if (reTxt.length == 0) return;
+  if (!reTxt.includes('(') || !reTxt.includes(')')) {
+    spanFilterError.innerText = 'Include at least one group (...)';
+    return;
+  }
+  try {
+    const re = new RegExp(reTxt, 'gu');
+    const txt = textTestInput.value;
+    filterState.innerText = reTxt;
+    let txtOut = '';
+
+    let lines = txt.split(/\r?\n+/g);
+    lines.forEach( (line) => {
+      //const res = line.match(re);
+      re.lastIndex = 0;
+      let res = re.exec(line);
+      if (res) {
+        txtOut += res.slice(1).join(' ') + '\r\n';
+      }
+    });
+
+    if (txtOut.length == 0)
+      textTestOutput.value = '!NOTHING!';
+    else {
+      textTestOutput.value = txtOut;
+    }
+    spanFilterError.innerText = '';
+  } catch(error) {
+    spanFilterError.innerText = error.message;
+  }
+}
+
+function dialogFilterClose(event) {
+  processInputText();  
+}
+
+btnFilter.addEventListener('click', ()=>{dlgFilter.showModal();});
+textTestInput.addEventListener('input', textTestInputChange);
+inputFilter.addEventListener('input', textTestInputChange);
+cbFilter.addEventListener('change', processInputText);
+dlgFilter.addEventListener('close', dialogFilterClose);
+
 </script>
 <a href='https://github.com/MattMatic/unique-words'>github.com/MattMatic/unique-words</a>
-<br/>2025-11-27
+<br/>2025-11-28
 </body>
 </html>
