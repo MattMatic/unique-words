@@ -287,6 +287,14 @@ function doUpdateButton() {
   processInputText();
 }
 
+function setTextArea(control, txt) {
+  if (txt.length < MAXIMUM_TEXT_SIZE)
+    control.value = txt;
+  else {
+    control.value = TOO_LARGE_TO_SHOW + txt.substr(0, MAXIMUM_TEXT_SIZE)+'...';
+  }
+}
+
 async function processInputText() {
   let input = blobText;
   var options = {
@@ -309,7 +317,11 @@ async function processInputText() {
   disableControls(true);
 
   const reTxt = inputFilter.value;
+  let rejectedLineCount = 0;
+  let rejected = '';
   if (cbFilter.checked && (reTxt.length > 0)) {
+    rejectArea.hidden = false;
+    rejectText.hidden = false;
     let inputNew = '';
     const re = new RegExp(reTxt, 'gu');
     const lines = input.split(/\r?\n+/g);
@@ -318,16 +330,20 @@ async function processInputText() {
       let res = re.exec(line);
       if (res) {
         inputNew += res.slice(1).join(' ')+'\r\n';
+      } else {
+        rejected += line + '\r\n';
+        rejectedLineCount++;
       }
     });
     input = inputNew;
+  } else {
+    rejectArea.hidden = true;
+    rejectText.hidden = true;
   }
 
-  if (input.length < MAXIMUM_TEXT_SIZE)
-    inputText.value = input;
-  else {
-    inputText.value = TOO_LARGE_TO_SHOW + input.substr(0, MAXIMUM_TEXT_SIZE)+'...';
-  }
+  setTextArea(inputText, input);
+  setTextArea(rejectText, rejected);
+  rejectedLineLabel.innerText = (rejectedLineCount > 0) ? `(${rejectedLineCount} lines)` : '';
 
   var wordsResult = await findUniqueWords(input, options, ignoreWords);
   const words = wordsResult.unique;
@@ -338,11 +354,7 @@ async function processInputText() {
   uniqueWordList = words;
   outputWords = words.join('\r\n');
 
-  if (outputWords.length > MAXIMUM_TEXT_SIZE) {
-    outputText.value = TOO_LARGE_TO_SHOW + outputWords.substr(0, MAXIMUM_TEXT_SIZE)+'...';
-  } else {
-    outputText.value = outputWords;
-  }
+  setTextArea(outputText, outputWords);
   disableControls(false);
 }
 
@@ -497,7 +509,15 @@ function handleIgnoreDragDrop(file) {
       Output:
       <textarea style='width:100%;' id='textTestOutput' rows=5 cols=40></textarea>      
     </dialog>
-    <textarea style="width:100%;line-clamp:2000" id="inputText" rows='8' oninput="updateInputText();">(paste text here, or drag and drop .txt file)</textarea>
+    <span id='rejectArea' hidden>
+        <span id='rejectedLineLabel'></span>
+        <br/>
+      Rejected Lines:
+      <textarea style="width:100%;line-clamp: :2000;background-color: #f8f0f0;" id="rejectText" rows='4' hidden></textarea>
+      <br/>
+      Accepted Lines:
+    </span>
+    <textarea style="width:100%;line-clamp:2000;background-color: #f8fff8;" id="inputText" rows='8' oninput="updateInputText();">(paste text here, or drag and drop .txt file)</textarea>
     <button id='btnAbort' hidden onclick='doAbortTheLoop();'>Abort</button>&nbsp;
     <span id='inputCount'>-</span>
   </td>
@@ -512,7 +532,7 @@ function handleIgnoreDragDrop(file) {
     <button onclick='downloadUniqueWords();' id='btnDownload'>Download</button>
   </th>
   <td>
-    <textarea style="width:100%;line-clamp:2000" id="outputText" rows='20'></textarea><div id='uniqueCount'>-</div>
+    <textarea style="width:100%;line-clamp:2000;background-color: #fffff8;" id="outputText" rows='20'></textarea><div id='uniqueCount'>-</div>
   </td>
 </tr>
 </table>
@@ -573,6 +593,6 @@ dlgFilter.addEventListener('close', dialogFilterClose);
 
 </script>
 <a href='https://github.com/MattMatic/unique-words'>github.com/MattMatic/unique-words</a>
-<br/>2025-11-28
+<br/>2025-12-01
 </body>
 </html>
