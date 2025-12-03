@@ -237,13 +237,22 @@ async function pasteInputText() {
     for (const item of clipboardContents) {
       if (item.types.includes('text/plain')) {
         const blob = await item.getType('text/plain');
-        blobText = await blob.text();
+        const txt = await blob.text();
+        if (cbAppend.checked)
+          blobText += '\r\n' + txt;
+        else
+          blobText = txt;
         processInputText();
       }
     }
   //} catch (error) {
   //  console.log(error.message);
   //}
+}
+
+async function clearInputText() {
+  blobText = '';
+  processInputText();
 }
 
 async function pasteIgnoreWords() {
@@ -347,8 +356,9 @@ async function processInputText() {
 
   var wordsResult = await findUniqueWords(input, options, ignoreWords);
   const words = wordsResult.unique;
-  var txt = wordsResult.inputCount + ' words';
-  if (wordsResult.numberCount > 0) txt += ', '+wordsResult.numberCount+' numbers';
+  var txt = `${wordsResult.inputCount} words`;
+  if (wordsResult.numberCount > 0) txt += `, ${wordsResult.numberCount} numbers`;
+  txt += `, from ${blobText.length} bytes`;
   inputCount.innerText = txt;
   uniqueCount.innerText = words.length + ' words';
   uniqueWordList = words;
@@ -390,7 +400,10 @@ function handeInputDragDrop(file) {
   if (!fileName.endsWith('.txt')) return;
   var reader = new FileReader();
   reader.onload = function(e) {
-    blobText = e.target.result;
+    if (cbAppend.checked)
+      blobText += '\r\n' + e.target.result;
+    else
+      blobText = e.target.result;
     processInputText();
   }
   reader.readAsText(file);
@@ -491,7 +504,9 @@ function handleIgnoreDragDrop(file) {
   <th>
     Input Text
     <br/>
-    <button onclick='pasteInputText();' id='btnPaste'>Paste</button>
+    <button onclick='clearInputText();' id='btnClear'>Clear</button><br/>
+    <button onclick='pasteInputText();' id='btnPaste'>Paste</button><br/>
+    <input type='checkbox' id='cbAppend'>Append</input><br/>
   </th>
   <td>
     <input type='checkbox' id='cbFilter' title='Enable RegExp filtering'>Filter</input>
@@ -593,6 +608,6 @@ dlgFilter.addEventListener('close', dialogFilterClose);
 
 </script>
 <a href='https://github.com/MattMatic/unique-words'>github.com/MattMatic/unique-words</a>
-<br/>2025-12-01
+<br/>2025-12-03
 </body>
 </html>
