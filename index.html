@@ -57,6 +57,9 @@ button:hover {
 </head>
 <body>
 
+<script src="js/officeParserBundle@5.2.2.js">
+  // https://github.com/harshankur/officeParser
+</script>
 <script>
 
 const MAXIMUM_TEXT_SIZE = 100000;
@@ -404,19 +407,37 @@ function updateLanguage() {
   document.documentElement.setAttribute('lang', HTMLLang.value);
 }
 
-function handeInputDragDrop(file) {
+async function handeInputDragDrop(file) {
   if (!file) return;
   const fileName = file.name.toLowerCase();
-  if (!fileName.endsWith('.txt')) return;
-  var reader = new FileReader();
-  reader.onload = function(e) {
+  if (fileName.endsWith('.docx') || fileName.endsWith('.doc')) {
+    // Handle Word DOCX and DOC files
+    const config = {
+        outputErrorToConsole: false,
+        newlineDelimiter: '\r\n',
+        ignoreNotes: true,
+        putNotesAtLast: false
+    };
+    const arrayBuffer = await file.arrayBuffer();
+    const result = await officeParser.parseOfficeAsync(arrayBuffer, config);
     if (cbAppend.checked)
-      blobText += '\r\n' + e.target.result;
+      blobText += '\r\n' + result;
     else
-      blobText = e.target.result;
+      blobText = result;
     processInputText();
+    return;
   }
-  reader.readAsText(file);
+  if (fileName.endsWith('.txt')) {
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      if (cbAppend.checked)
+        blobText += '\r\n' + e.target.result;
+      else
+        blobText = e.target.result;
+      processInputText();
+    }
+    reader.readAsText(file);
+  }
 }
 
 function splitLinesToArray(txt) {
@@ -629,6 +650,6 @@ cbRtl.addEventListener('change', processRtl);
 
 </script>
 <a href='https://github.com/MattMatic/unique-words'>github.com/MattMatic/unique-words</a>
-<br/>2025-12-04 k
+<br/>2025-12-04 l
 </body>
 </html>
