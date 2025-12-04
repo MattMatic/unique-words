@@ -42,7 +42,7 @@ dialog {
   border: 1px solid;
   border-radius: 50%;
 }
-button {
+button.btn {
   font-weight: bold;
   font-family: "Calibri";
   font-size: 90%;
@@ -486,7 +486,7 @@ function handleIgnoreDragDrop(file) {
   <th>
     Options
     <br/>
-    <button onclick='doUpdateButton();' id='btnUpdate' disabled>Update</button>
+    <button class='btn' onclick='doUpdateButton();' id='btnUpdate' disabled>Update</button>
   </th>
   <td>
     <input type='checkbox' id='cbNumbers' onclick='optionsChanged();' title='Include words that include numbers'>Numbers</input>
@@ -503,8 +503,8 @@ function handleIgnoreDragDrop(file) {
   <th>
     Known Words to Ignore
     <br/>
-    <button onclick='clearIgnoreWords();' id='btnClearIgnore'>Clear</button>
-    <button onclick='pasteIgnoreWords();' id='btnPasteIgnore'>Paste</button>
+    <button class='btn' onclick='clearIgnoreWords();' id='btnClearIgnore'>Clear</button>
+    <button class='btn' onclick='pasteIgnoreWords();' id='btnPasteIgnore'>Paste</button>
   </th>
   <td id='tdIgnoreWords'>
     (drag and drop .txt file)
@@ -515,15 +515,15 @@ function handleIgnoreDragDrop(file) {
   <th>
     Input Text
     <br/>
-    <button onclick='clearInputText();' id='btnClear'>Clear</button><br/>
-    <button onclick='pasteInputText();' id='btnPaste'>Paste</button><br/>
+    <button class='btn' onclick='clearInputText();' id='btnClear'>Clear</button><br/>
+    <button class='btn' onclick='pasteInputText();' id='btnPaste'>Paste</button><br/>
     <input type='checkbox' id='cbAppend'>Append</input><br/>
   </th>
   <td>
     <input type='checkbox' id='cbFilter' title='Enable RegExp filtering'>Filter</input>
-    <button id='btnFilter'>RegExp...</button> <kbd><span id='filterState'>(off)</span></kbd>
+    <button class='btn' id='btnFilter'>RegExp...</button> <kbd><span id='filterState'>(off)</span></kbd>
     <dialog id='dlgFilter'>
-      <button type="submit" aria-label="close" onclick="dlgFilter.close();">X</button>
+      <button type="submit" aria-label="close" class="btn-close" onclick="dlgFilter.close();">X</button>
       <h2>RegExp Filter</h2>
       <kbd>/<input type='text' style='font-family:monospace;' id='inputFilter'/>/gu</kbd>
       <br/>
@@ -544,7 +544,7 @@ function handleIgnoreDragDrop(file) {
       Accepted Lines:
     </span>
     <textarea style="width:100%;line-clamp:2000;background-color: #f8fff8;" id="inputText" rows='8' oninput="updateInputText();">(paste text here, or drag and drop .txt file)</textarea>
-    <button id='btnAbort' hidden onclick='doAbortTheLoop();'>Abort</button>&nbsp;
+    <button class='btn' id='btnAbort' hidden onclick='doAbortTheLoop();'>Abort</button>&nbsp;
     <span id='inputCount'>-</span>
   </td>
 </tr>
@@ -553,9 +553,9 @@ function handleIgnoreDragDrop(file) {
   <th>
     Unique Words
     <br/>
-    <button onclick='copyUniqueWords();' id='btnCopyToClipboard'>Copy to Clipboard</button>
+    <button class='btn' onclick='copyUniqueWords();' id='btnCopyToClipboard'>Copy to Clipboard</button>
     <br/>
-    <button onclick='downloadUniqueWords();' id='btnDownload'>Download</button>
+    <button class='btn' onclick='downloadUniqueWords();' id='btnDownload'>Download</button>
   </th>
   <td>
     <textarea style="width:100%;line-clamp:2000;background-color: #fffff8;" id="outputText" rows='20'></textarea><div id='uniqueCount'>-</div>
@@ -616,6 +616,8 @@ function processRtl(event) {
   inputText.dir = txt;
   outputText.dir = txt;
   rejectText.dir = txt;
+  textTestInput.dir = txt;
+  textTestOutput.dir = txt;
 }
 
 btnFilter.addEventListener('click', ()=>{dlgFilter.showModal();});
@@ -627,6 +629,6 @@ cbRtl.addEventListener('change', processRtl);
 
 </script>
 <a href='https://github.com/MattMatic/unique-words'>github.com/MattMatic/unique-words</a>
-<br/>2025-12-04 i
+<br/>2025-12-04 k
 </body>
 </html>
