@@ -42,8 +42,18 @@ dialog {
   border: 1px solid;
   border-radius: 50%;
 }
-
+button {
+  font-weight: bold;
+  font-family: "Calibri";
+  font-size: 90%;
+  padding: 2px;
+  width: 6em;
+}
+button:hover {
+  background-color: hsl(120, 20%, 50%, 0.5);  
+}
 </style>
+
 </head>
 <body>
 
@@ -467,6 +477,7 @@ function handleIgnoreDragDrop(file) {
   </th>
   <td>
     <input type='text' id='HTMLLang' oninput='updateLanguage();' title='Web page language ID'/>
+    <input type='checkbox' id='cbRtl'>RTL</input>
     <a href='https://www.w3schools.com/tags/ref_language_codes.asp' target='_blank'>(W3 Schools reference)</a>
   </td>
 </tr>
@@ -600,14 +611,22 @@ function dialogFilterClose(event) {
   processInputText();  
 }
 
+function processRtl(event) {
+  const txt = cbRtl.checked ? 'rtl' : 'ltr';
+  inputText.dir = txt;
+  outputText.dir = txt;
+  rejectText.dir = txt;
+}
+
 btnFilter.addEventListener('click', ()=>{dlgFilter.showModal();});
 textTestInput.addEventListener('input', textTestInputChange);
 inputFilter.addEventListener('input', textTestInputChange);
 cbFilter.addEventListener('change', processInputText);
 dlgFilter.addEventListener('close', dialogFilterClose);
+cbRtl.addEventListener('change', processRtl);
 
 </script>
 <a href='https://github.com/MattMatic/unique-words'>github.com/MattMatic/unique-words</a>
-<br/>2025-12-03
+<br/>2025-12-04 i
 </body>
 </html>
