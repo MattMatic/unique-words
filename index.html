@@ -225,7 +225,7 @@ function patchDragDrop(ele, foo) {
     cancel(e);
     const file = e.dataTransfer.files[0];
     ele.style.backgroundColor = null;
-    foo(file, ele);
+    foo(file, ele, e.dataTransfer.files);
   });
 }
 document.addEventListener('dragover', cancel, false);
@@ -407,37 +407,61 @@ function updateLanguage() {
   document.documentElement.setAttribute('lang', HTMLLang.value);
 }
 
-async function handeInputDragDrop(file) {
-  if (!file) return;
-  const fileName = file.name.toLowerCase();
-  if (fileName.endsWith('.docx') || fileName.endsWith('.doc')) {
-    // Handle Word DOCX and DOC files
-    const config = {
-        outputErrorToConsole: false,
-        newlineDelimiter: '\r\n',
-        ignoreNotes: true,
-        putNotesAtLast: false
-    };
-    const arrayBuffer = await file.arrayBuffer();
-    const result = await officeParser.parseOfficeAsync(arrayBuffer, config);
-    if (cbAppend.checked)
-      blobText += '\r\n' + result;
-    else
-      blobText = result;
-    processInputText();
-    return;
+function isOfficeDocument(fileName) {
+  const extensions = ['.docx', '.doc', '.pptx', '.xlsx', '.odt', '.odp', '.ods'];
+  for (let i=0; i<extensions.length; i++) {
+    if (fileName.endsWith(extensions[i]))
+      return true;
   }
-  if (fileName.endsWith('.txt')) {
-    var reader = new FileReader();
-    reader.onload = function(e) {
-      if (cbAppend.checked)
-        blobText += '\r\n' + e.target.result;
-      else
-        blobText = e.target.result;
-      processInputText();
+  return false;
+}
+
+// get contents of a file as obtained from an html input type=file element
+function getFileContents(file) {
+  return new Promise((resolve, reject) => {
+    let contents = ""
+    const reader = new FileReader()
+    reader.onload = function (e) {
+      contents = e.target.result
+      resolve(contents)
     }
-    reader.readAsText(file);
+    reader.onerror = function (e) {
+      reject(e)
+    }
+    reader.readAsText(file)
+  })
+}
+
+async function handeInputDragDrop(file, event, files) {
+  if (!file || !files) return;
+  const doAppend = cbAppend.checked;
+  let txt = blobText;
+  if (!doAppend) txt = '';
+
+  for (let i=0; i<files.length; i++) {
+    file = files[i];
+    const fileName = file.name.toLowerCase();
+    if (isOfficeDocument(fileName)) {
+      // Handle Word DOCX and DOC files
+      const config = {
+          outputErrorToConsole: false,
+          newlineDelimiter: '\r\n',
+          ignoreNotes: true,
+          putNotesAtLast: false
+      };
+      const arrayBuffer = await file.arrayBuffer();
+      const result = await officeParser.parseOfficeAsync(arrayBuffer, config);
+      if (txt.length > 0) txt += '\r\n';
+      txt += result;
+    } else
+    if (fileName.endsWith('.txt')) {
+      // Handle plain text files
+      const result = await getFileContents(file);
+      txt += result;
+    }
   }
+  blobText = txt;
+  processInputText();
 }
 
 function splitLinesToArray(txt) {
@@ -650,6 +674,6 @@ cbRtl.addEventListener('change', processRtl);
 
 </script>
 <a href='https://github.com/MattMatic/unique-words'>github.com/MattMatic/unique-words</a>
-<br/>2025-12-04 l
+<br/>2025-12-04 m
 </body>
 </html>
